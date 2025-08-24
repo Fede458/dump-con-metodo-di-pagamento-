@@ -1,8 +1,9 @@
--- ▶️ RESET E SCHEMA
+-- ▶️ RESET E SCHEMA COMPLETO
 
 DROP TABLE IF EXISTS Biglietto;
 DROP TABLE IF EXISTS Treno_Tratta;
 DROP TABLE IF EXISTS Treno;
+DROP TABLE IF EXISTS Scalo;
 DROP TABLE IF EXISTS Tratta;
 DROP TABLE IF EXISTS Passeggero;
 DROP TABLE IF EXISTS Utenti;
@@ -17,20 +18,20 @@ DROP TABLE IF EXISTS Invoices;
 
 -- ▶️ CREAZIONE TABELLE
 
--- Tabella Utenti per gestire gli utenti e le password hashate
+-- Tabella Utenti
 CREATE TABLE Utenti (
     id_utente INTEGER PRIMARY KEY,
     email TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL  -- La password sarà memorizzata come hash
+    password_hash TEXT NOT NULL
 );
 
--- Tabella Ruoli per gestire i ruoli degli utenti
+-- Tabella Ruoli
 CREATE TABLE Ruoli (
     id_ruolo INTEGER PRIMARY KEY,
     nome TEXT NOT NULL
 );
 
--- Tabella per associare ruoli agli utenti
+-- Relazione Utente-Ruolo
 CREATE TABLE Utente_Ruolo (
     id_utente INTEGER NOT NULL,
     id_ruolo INTEGER NOT NULL,
@@ -39,7 +40,7 @@ CREATE TABLE Utente_Ruolo (
     FOREIGN KEY(id_ruolo) REFERENCES Ruoli(id_ruolo)
 );
 
--- Tabella Passeggero per i dati dei passeggeri
+-- Tabella Passeggero
 CREATE TABLE Passeggero (
     id_passeggero INTEGER PRIMARY KEY,
     nome TEXT NOT NULL,
@@ -47,14 +48,14 @@ CREATE TABLE Passeggero (
     email TEXT UNIQUE NOT NULL
 );
 
--- Tabella Treno per i dati dei treni
+-- Tabella Treno
 CREATE TABLE Treno (
     id_treno INTEGER PRIMARY KEY,
     modello TEXT NOT NULL,
     capienza INTEGER NOT NULL CHECK(capienza > 0)
 );
 
--- Tabella Tratta per i dati delle tratte ferroviarie
+-- Tabella Tratta
 CREATE TABLE Tratta (
     id_tratta INTEGER PRIMARY KEY,
     stazione_partenza TEXT NOT NULL,
@@ -64,7 +65,17 @@ CREATE TABLE Tratta (
     ritardo_minuti INTEGER DEFAULT 0 CHECK(ritardo_minuti >= 0)
 );
 
--- Tabella di relazione molti-a-molti tra Treno e Tratta
+-- Tabella Scalo (fermate intermedie)
+CREATE TABLE Scalo (
+    id_scalo INTEGER PRIMARY KEY,
+    id_tratta INTEGER NOT NULL,
+    stazione TEXT NOT NULL,
+    orario_arrivo TEXT NOT NULL,
+    orario_partenza TEXT NOT NULL,
+    FOREIGN KEY(id_tratta) REFERENCES Tratta(id_tratta)
+);
+
+-- Relazione Treno-Tratta
 CREATE TABLE Treno_Tratta (
     id_treno INTEGER NOT NULL,
     id_tratta INTEGER NOT NULL,
@@ -73,7 +84,7 @@ CREATE TABLE Treno_Tratta (
     FOREIGN KEY(id_tratta) REFERENCES Tratta(id_tratta)
 );
 
--- Tabella Biglietto per i dati dei biglietti
+-- Tabella Biglietto
 CREATE TABLE Biglietto (
     id_biglietto INTEGER PRIMARY KEY,
     id_passeggero INTEGER NOT NULL,
@@ -85,51 +96,47 @@ CREATE TABLE Biglietto (
     FOREIGN KEY(id_tratta) REFERENCES Tratta(id_tratta)
 );
 
--- Nuove tabelle per il sistema di pagamento
+-- 🔹 Nuove tabelle per il sistema di pagamento
 
--- Tabella Metodi di pagamento
 CREATE TABLE PaymentMethods (
     payment_method_id INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
     description TEXT
 );
 
--- Tabella Transazioni per gestire i pagamenti
 CREATE TABLE Transactions (
     transaction_id INTEGER PRIMARY KEY,
     user_id INTEGER,
     payment_method_id INTEGER,
     amount DECIMAL(10, 2),
     transaction_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    status TEXT,  -- 'success', 'failed', 'pending'
+    status TEXT,
     FOREIGN KEY(user_id) REFERENCES Utenti(id_utente),
     FOREIGN KEY(payment_method_id) REFERENCES PaymentMethods(payment_method_id)
 );
 
--- Tabella Dettagli della carta di credito (da trattare con molta attenzione)
 CREATE TABLE CreditCardDetails (
     card_id INTEGER PRIMARY KEY,
     user_id INTEGER,
-    card_number TEXT NOT NULL,  -- (criptato in un sistema reale)
-    card_type TEXT NOT NULL,  -- 'Visa', 'MasterCard', etc.
+    card_number TEXT NOT NULL,
+    card_type TEXT NOT NULL,
     expiration_date DATE,
-    cvv TEXT NOT NULL,  -- (criptato in un sistema reale)
+    cvv TEXT NOT NULL,
     FOREIGN KEY(user_id) REFERENCES Utenti(id_utente)
 );
 
--- Tabella Fatture
 CREATE TABLE Invoices (
     invoice_id INTEGER PRIMARY KEY,
     transaction_id INTEGER,
     issue_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     amount DECIMAL(10, 2),
-    status TEXT,  -- 'paid', 'unpaid', 'cancelled'
+    status TEXT,
     FOREIGN KEY(transaction_id) REFERENCES Transactions(transaction_id)
 );
 
--- ▶️ DATI
+-- ▶️ DATI DI ESEMPIO
 
--- Inserimento dei dati di esempio nella tabella Passeggero
+-- Passeggeri
 INSERT INTO Passeggero VALUES
 (1, 'Antonio', 'De Luca', 'antonio.deluca@esempio.com'),
 (2, 'Chiara', 'D''Amico', 'chiara.damico@esempio.com'),
@@ -137,13 +144,13 @@ INSERT INTO Passeggero VALUES
 (4, 'Laura', 'Barbieri', 'laura.barbieri@example.com'),
 (5, 'Marco', 'Conti', 'marco.conti@example.com');
 
--- Inserimento dei dati nella tabella Treno
+-- Treni
 INSERT INTO Treno VALUES
 (1, 'Frecciarossa Sud', 400),
 (2, 'Intercity Notte', 300),
 (3, 'Regionale Veloce', 250);
 
--- Inserimento dei dati nella tabella Tratta
+-- Tratte
 INSERT INTO Tratta VALUES
 (1, 'Napoli Centrale', 'Bari Centrale', '08:00', '11:30', 10),
 (2, 'Lecce', 'Reggio Calabria', '12:00', '17:00', 25),
@@ -151,11 +158,26 @@ INSERT INTO Tratta VALUES
 (4, 'Salerno', 'Taranto', '10:30', '14:00', 0),
 (5, 'Roma Termini', 'Firenze SMN', '07:00', '09:00', 2);
 
--- Inserimento dei dati nella tabella Treno_Tratta
+-- Scali intermedi
+INSERT INTO Scalo VALUES
+(1, 1, 'Caserta', '08:45', '08:50'),
+(2, 1, 'Benevento', '09:40', '09:45'),
+(3, 1, 'Foggia', '10:40', '10:50'),
+(4, 2, 'Brindisi', '12:40', '12:45'),
+(5, 2, 'Taranto', '13:30', '13:35'),
+(6, 2, 'Cosenza', '15:20', '15:30'),
+(7, 3, 'Villa San Giovanni', '11:30', '11:40'),
+(8, 3, 'Messina Centrale', '12:20', '12:30'),
+(9, 4, 'Potenza', '11:40', '11:45'),
+(10, 4, 'Metaponto', '13:20', '13:25'),
+(11, 5, 'Orte', '07:40', '07:42'),
+(12, 5, 'Arezzo', '08:20', '08:25');
+
+-- Relazioni Treno-Tratta
 INSERT INTO Treno_Tratta VALUES
 (1, 1), (2, 2), (3, 3), (1, 4), (1, 5), (2, 5);
 
--- Inserimento dei dati nella tabella Biglietto
+-- Biglietti
 INSERT INTO Biglietto VALUES
 (1, 1, 1, '14B', 45.00, date('now', '-7 days')),
 (2, 2, 2, '9C', 60.50, date('now', '-6 days')),
@@ -168,21 +190,32 @@ INSERT INTO Biglietto VALUES
 (9, 2, 1, '10E', 45.00, date('now')),
 (10, 5, 2, '1A', 60.50, date('now'));
 
--- Inserimento dei metodi di pagamento
+-- Ruoli e Utenti
+INSERT INTO Ruoli VALUES
+(1, 'Amministratore'),
+(2, 'Operatore');
+
+INSERT INTO Utenti VALUES
+(1, 'admin@example.com', 'hash_per_password_admin'),
+(2, 'operator@example.com', 'hash_per_password_operator');
+
+INSERT INTO Utente_Ruolo VALUES (1, 1), (2, 2);
+
+-- Metodi di pagamento
 INSERT INTO PaymentMethods VALUES
 (1, 'Credit Card', 'Visa, MasterCard, American Express'),
 (2, 'PayPal', 'Pagamento tramite PayPal'),
 (3, 'Bank Transfer', 'Bonifico Bancario');
 
--- Esempio di transazione
+-- Transazioni
 INSERT INTO Transactions VALUES
 (1, 1, 1, 150.00, '2025-07-10 15:30:00', 'success'),
 (2, 2, 2, 60.50, '2025-07-10 16:00:00', 'pending');
 
--- Esempio di dettagli carta di credito
+-- Carte di credito
 INSERT INTO CreditCardDetails VALUES
 (1, 1, '4111111111111111', 'Visa', '2026-12-01', '123');
 
--- Esempio di fattura
+-- Fatture
 INSERT INTO Invoices VALUES
 (1, 1, '2025-07-10 15:30:00', 150.00, 'paid');
